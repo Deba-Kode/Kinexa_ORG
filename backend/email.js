@@ -2,8 +2,8 @@ import nodemailer from 'nodemailer';
 const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     auth: {
-        user: 'pushpakbhoitephotos@gmail.com',
-        pass: 'gjgb xulv oujv gtnm'
+        user: 'debashishraut9860@gmail.com',
+        pass: 'fvch rldb kjnc cpdr'
     }
 });
 export default transporter;
