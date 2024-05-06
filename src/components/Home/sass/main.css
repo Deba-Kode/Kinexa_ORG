@@ -713,8 +713,6 @@ button.log_btn:hover {
 
 .post_page {
   z-index: 1;
-  display: grid;
-  grid-template-columns: 1fr 9fr;
 }
 @media screen and (max-width: 768px) {
   .post_page {

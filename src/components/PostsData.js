@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useQuery } from '@apollo/client';
 import { GET_ALL_POSTS } from '../gqlOperations/queries.js';
-import Comment from './Comment.js'; // Import Comment component
+import Comment from './Comment.js'; 
+import img from '../altImage/user.png'
 
 export default function PostsData() {
     const { loading, error, data } = useQuery(GET_ALL_POSTS);
@@ -12,47 +13,85 @@ export default function PostsData() {
     useEffect(() => {
         if (data && data.posts && data.posts.length !== 0) {
             data.posts.forEach(post => {
-                getPost(post._id, post.imageUpload);
+                getPost(post);
             });
         }
+        fetchLikedPosts();
     }, [data]);
 
-    async function getPost(post_id, img_name) {
+    async function fetchLikedPosts() {
         try {
-            const response = await axios.post("http://localhost:3001/uploads/posts", { post_id, img_name });
+            const uID = localStorage.getItem('userId');
+            const response = await axios.get(`http://192.168.0.164:3001/user-liked-posts?uID=${uID}`);
+            const likedPosts = response.data;
+            const newHeartFilled = {};
+            likedPosts.forEach(post => {
+                newHeartFilled[post._id] = true;
+            });
+            setHeartFilled(newHeartFilled);
+        } catch (error) {
+            console.error('Error fetching liked posts:', error.message);
+        }
+    }
+
+    async function getPost(post) {
+        try {
+            const response = await axios.post("http://192.168.0.164:3001/uploads/posts", { post_id: post._id, img_name: post.imageUpload });
             const base64Image = `data:image/png;base64,${response.data}`;
             setIMG(prevState => ({
                 ...prevState,
-                [post_id]: base64Image
+                [post._id]: base64Image
             }));
+
+            if (post.userID && post.userID.profilePic) {
+                const profilePicResponse = await axios.post("http://192.168.0.164:3001/uploads/imagesProfile", { user_id: post.userID._id, img_name: post.userID.profilePic });
+                const profilePic = `data:image/png;base64,${profilePicResponse.data}`;
+
+                setIMG(prevState => ({
+                    ...prevState,
+                    [`profilePic_${post.userID._id}`]: profilePic
+                }));
+            }
         } catch (error) {
             console.error('Error fetching image:', error.message);
         }
     }
 
-    // Function to handle click event of heart icon 
-    const handleHeartClick = (post_id) => {
-        setHeartFilled(prevState => ({
-            ...prevState,
-            [post_id]: !prevState[post_id] // Toggle the filled state
-        }));
+    const handleHeartClick = async (post_id) => {
+        try {
+            const uID = localStorage.getItem('userId');
+            setHeartFilled(prevState => ({
+                ...prevState,
+                [post_id]: !prevState[post_id]
+            }));
+            await axios.post(`http://192.168.0.164:3001/like-post`, { post_id, uID });
+        } catch (error) {
+            console.error('Error liking post:', error.message);
+        }
     };
 
-    // const handleCommentSubmit = async (commentContent, postId) => {
-    //     try {
-    //         const response = await axios.post('http://localhost:3001/user-comment', {
-    //             commentContent,
-    //             postId // Include the post ID when submitting the comment
-    //         });
-    //         // console.log(response.data);
-    //     } catch (error) {
-    //         console.error('Error:', error.message);
-    //     }
-    // };
+    function getTimeAgo(timestamp) {
+        const now = Date.now();
+        const diff = now - timestamp;
+        const seconds = Math.floor(diff / 1000);
+        if (seconds >= 24 * 3600) {
+            const days = Math.floor(seconds / (24 * 3600));
+            return `${days} d${days > 1 ? '' : ''}`;
+        }
+        else if (seconds >= 3600) {
+            const hours = Math.floor(seconds / 3600);
+            return `${hours} h${hours > 1 ? '' : ''}`;
+        }
+        else{
+            const minutes = Math.floor(seconds / 60);
+            return `${minutes} m${minutes > 1 ? '' : ''}`;
+        }
+    }
 
     if (loading) return <h1>Loading</h1>;
     if (error) {
-        console.log(error.message);
+        alert(error);
+        console.error("Error fetching data:", error);
         return <h1>Error</h1>;
     }
     if (!data || !data.posts || data.posts.length === 0) {
@@ -63,18 +102,42 @@ export default function PostsData() {
         <div className='container my-container'>
             {data.posts.map(post => (
                 <div className="row justify-content-center mb-1" key={post._id}>
-                    <div className="col-md-8 my-0 mb-3" style={{maxWidth: "700px" }}>
+                    <div className="col-md-8 my-0 mb-3" style={{ maxWidth: "700px" }}>
                         <blockquote className="blockquote" style={{ padding: '0px' }}>
-                            <h5 style={{ textAlign: "left" }}>{post._id}</h5>
+                            <div className='d-flex align-items-center gap-2 '>
+                                <div className='m-1'>
+                                    {post.userID && post.userID.profilePic && imgData[`profilePic_${post.userID._id}`] ? (
+                                        <img src={imgData[`profilePic_${post.userID._id}`]} className='img-fluid rounded-circle large-image'
+                                            alt='User Profile Pic'
+                                            style={{ width: '50px', height: '50px', border: "2px solid red", padding: "1px" }} />
+                                    ) : (
+                                        <img src={img} className='img-fluid rounded-circle large-image'
+                                            alt='User Profile Pic'
+                                            style={{ width: '40px', height: '40px', border: "2px solid red", padding: "1px" }} />
+                                    )}
+                                </div>
+                                <div className='d-flex justify-content-center align-item-center'>
+                                    {
+                                        post.userID && (
+                                            <>
+                                                <div className='me-2'>
+                                                    <h6 style={{ textAlign: "left" }}>{`${post.userID.userName}`}</h6>
+                                                </div>
+                                                <div className='d-flex justify-content-start alignment-item-top'>
+                                                    <span style={{ textAlign: "left", fontSize: "13px" }}>{`${getTimeAgo(post.createdAt)}`}</span>
+                                                </div>
+                                            </>
+                                        )
+                                    }
+                                </div>
+                            </div>
                             <button
                                 style={{
                                     border: 'none',
                                     background: 'none',
-                                    padding: 0, // Remove default padding
-                                    cursor: 'pointer' // Change cursor to pointer on hover
+                                    padding: 0,
+                                    cursor: 'pointer'
                                 }}
-                                data-bs-toggle="modal"
-                                data-bs-target={`#exampleModal-${post._id}`}
                             >
                                 <img
                                     src={imgData[post._id]}
@@ -108,15 +171,27 @@ export default function PostsData() {
                                     <i className='bi bi-send' style={{ fontSize: '1.7rem', cursor: 'pointer' }}></i>
                                 </button>
                             </div>
-                            <p className="" style={{ textAlign: "left", fontWeight: "bold" }}>
+                            <p className="mt-0 mb-2" style={{ textAlign: "left", fontWeight: "bold" }}>{post.likeCount} Likes</p>
+                            <p className="mt-0" style={{ textAlign: "left", fontWeight: "bold" }}>
                                 {post.caption}
                             </p>
+                            <hr />
                         </blockquote>
                     </div>
-                    {/* Render the Comment modal component inside the map function */}
-                    <Comment postId={post._id} />
+                    <Comment key={`comment-${post._id}`} postId={post._id} />
                 </div>
             ))}
         </div>
     );
 }
+
+
+
+
+
+
+
+
+
+
+

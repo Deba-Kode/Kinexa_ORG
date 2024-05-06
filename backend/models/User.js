@@ -62,10 +62,13 @@ const userSchema = new mongoose.Schema({
     },
     profilePic: {
         type: String,
-        // required: true
     },
     coverPic: {
         type: String
+    },
+    resetToken: {
+        type: String,
+        default: null
     }
 });
 

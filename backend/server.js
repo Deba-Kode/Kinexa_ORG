@@ -13,23 +13,38 @@ import Post from './models/Post.js';
 import imageToBase64 from 'image-to-base64';
 import Comment from './models/Comment.js';
 import jwt from 'jsonwebtoken';
+import { ApolloServer } from "apollo-server-express";
+import { ApolloServerPluginLandingPageGraphQLPlayground } from "apollo-server-core";
+import typeDefs from "./SchemalGQL.js";
+import resolvers from './resolvers.js';
+import otpGenerator from 'otp-generator';
+import session from 'express-session';
+import transporter from './email.js';
+import crypto from 'crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const port = 3001;
+const corsOptions = {
+    origin: "*",
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+};
 
-
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(cors());
-
+app.use(cors(corsOptions));
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
+app.use(session({
+    secret: 'key',
+    resave: false,
+    saveUninitialized: false
+}));
 
 function setUser(user) {
-    return jwt.sign(
-        {
-            id: user._id
-        },
-        "Shhh"
+    return jwt.sign({
+        id: user._id
+    }, "Shhh"
     );
 }
 
@@ -43,13 +58,24 @@ function isAuthenticated(req, res, next) {
     req.userID = decode.userId
     next();
 }
-//login verification route
+
+let UserLoggedInFront = null;
+const handleNameUserLog = (req, res) => {
+    const { UserName } = req.body;
+    UserLoggedInFront = UserName;
+    res.status(200).json({ message: "UserName received" });
+};
+
+app.post('/NameUserLog', handleNameUserLog);
+
 app.get('/api/verify', isAuthenticated, (req, res) => {
     res.status(200).json({ message: "User authorized" });
 });
+
 app.get('/api/logout', (req, res) => {
     res.status(200).json({ message: 'Logged out successfully' });
 });
+
 const connectDB = async () => {
     try {
         await mongoose.connect(`mongodb+srv://debashishadcs:qwerty12345@kinexa.nbb9j9q.mongodb.net/Kinexa`);
@@ -58,8 +84,101 @@ const connectDB = async () => {
         console.error("Error connecting to MongoDB Atlas:", error);
     }
 };
-
 connectDB();
+
+const server = new ApolloServer({
+    typeDefs,
+    resolvers,
+    plugins: [
+        ApolloServerPluginLandingPageGraphQLPlayground()
+    ],
+    cors: {
+        origin: [
+            "http://localhost:3000",
+            "http://192.168.0.164:3000",
+        ],
+        methods: ["GET", "POST"]
+    },
+    context: ({ req }) => {
+        return {
+            UserLoggedInFront
+        };
+    },
+});
+
+async function startServer() {
+    await server.start();
+    server.applyMiddleware({ app });
+}
+
+startServer().then(() => {
+    app.listen(port, () => {
+        console.log(`🚀 Listening to the server at port ${port}`);
+    });
+});
+
+app.get('/comments/:postId', async (req, res) => {
+    try {
+        const postId = req.params.postId;
+        const comments = await Comment.find({ postID: postId }).populate('userID', 'userName');
+        res.json(comments);
+    } catch (error) {
+        console.error('Error fetching comments:', error);
+        res.status(500).json({ error: 'Failed to fetch comments' });
+    }
+});
+
+app.post("/update-user", async (req, res) => {
+    try {
+        const userId = req.body._id;
+        console.log("User Id I have got is:", userId);
+        const updatedUserData = req.body;
+        delete updatedUserData._id;
+        await User.findByIdAndUpdate(userId, updatedUserData);
+        res.status(200).json({ message: "User data updated successfully" });
+    } catch (error) {
+        console.error("Error updating user data:", error);
+        res.status(500).json({ error: "Failed to update user data" });
+    }
+});
+
+app.get('/user-liked-posts', async (req, res) => {
+    try {
+        const { uID } = req.query;
+        const user = await User.findById(uID);
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        const likedPosts = await Post.find({ likes: uID });
+        res.status(200).json(likedPosts);
+    } catch (error) {
+        console.error("Error fetching liked posts:", error);
+        res.status(500).json({ error: "Failed to fetch liked posts" });
+    }
+});
+
+app.post('/like-post', async (req, res) => {
+    try {
+        const { post_id, uID } = req.body;
+        const post = await Post.findById(post_id);
+        if (!post) {
+            return res.status(404).json({ error: "Post not found" });
+        }
+        const likedIndex = post.likes.indexOf(uID);
+        if (likedIndex !== -1) {
+            post.likes.splice(likedIndex, 1);
+            await post.save();
+            return res.status(200).json({ message: "Post unliked successfully" });
+        } else {
+            post.likes.push(uID);
+            await post.save();
+            return res.status(200).json({ message: "Post liked successfully" });
+        }
+    } catch (error) {
+        console.error("Error toggling post like:", error);
+        res.status(500).json({ error: "Failed to toggle post like" });
+    }
+});
 
 app.post("/register", async (req, res) => {
     try {
@@ -112,13 +231,11 @@ app.post("/register", async (req, res) => {
                 if (files.coverPic) {
                     const file = files.coverPic[0].filepath;
                     const newFilePath = path.join(coverPic, files.coverPic[0].originalFilename);
-                    // console.log("THis is new file path" + newFilePath);
                     try {
                         fs.copyFile(file, newFilePath, function (err) {
                             if (err) throw err;
                         });
                         await User.updateOne({ _id: newUser._id });
-                        // console.log("Image stored successfully.");
                     } catch (error) {
                         console.error("Error storing image:", error);
                     }
@@ -136,7 +253,6 @@ app.post("/register", async (req, res) => {
                         fs.copyFile(file, newFilePath, function (err) {
                             if (err) throw err;
                         });
-                        // console.log(file);
                         await User.updateOne({ _id: newUser._id });
                     } catch (error) {
                         console.error("Error storing image:", error);
@@ -156,7 +272,6 @@ app.post("/register", async (req, res) => {
 
 app.post('/uploads/images', (req, res) => {
     const file_path = __dirname + "/uploads/coverPic/" + req.body.user_id + "/" + req.body.img_name;
-    // console.log(file_path);
     imageToBase64(file_path)
         .then(
             (response) => {
@@ -171,10 +286,23 @@ app.post('/uploads/images', (req, res) => {
 });
 
 app.post('/uploads/imagesProfile', (req, res) => {
-    // console.log("UserID -> " + req.body.user_id)
-    // console.log("Image -> " + req.body.img_name)
     const file_path = __dirname + "/uploads/profilePic/" + req.body.user_id + "/" + req.body.img_name;
-    // console.log("File Path is ->" + file_path);
+    imageToBase64(file_path)
+        .then(
+            (response) => {
+                res.status(200).send(response)
+            }
+        )
+        .catch(
+            (error) => {
+                console.log(error);
+            }
+        )
+});
+
+
+app.post('/uploads/imagesProfileSide', (req, res) => {
+    const file_path = __dirname + "/uploads/profilePic/" + req.body.user_id + "/" + req.body.img_name;
     imageToBase64(file_path)
         .then(
             (response) => {
@@ -221,32 +349,28 @@ app.post("/upload-post", async (req, res) => {
         if (files) {
             var oldPath = files.imageUpload[0].filepath;
             const og_file_path = files.imageUpload[0].originalFilename;
-            // console.log(og_file_path);
+            const userID = fields.userID;
             const newPost = new Post({
                 imageUpload: og_file_path,
-                caption: fields.caption[0]
+                caption: fields.caption[0],
+                userID: userID
             });
             const result = await newPost.save();
             const Post_Images = path.join(__dirname, './uploads/Post_Images', result._id.toString());
             if (!fs.existsSync(Post_Images)) {
                 fs.mkdirSync(Post_Images);
             }
-            // console.log("This is my post", Post_Images);
             if (Post_Images && Post_Images.length > 0) {
                 const file = files.imageUpload[0].filepath;
-                // console.log("File to copy:", file);
                 const newFilePath = path.join(Post_Images, files.imageUpload[0].originalFilename);
-                // console.log("Destination path:", newFilePath);
                 try {
                     fs.copyFile(file, newFilePath, function (err) {
                         if (err) throw err;
-                        console.log("Image stored successfully.");
                     });
                 } catch (error) {
                     console.error("Error storing image:", error);
                 }
-            }
-            else {
+            } else {
                 console.error("No image file found.");
             }
             return res.send('success');
@@ -257,10 +381,15 @@ app.post("/upload-post", async (req, res) => {
     }
 });
 
+
 app.post("/user-comment", async (req, res) => {
     try {
-        const { commentContent, postId } = req.body; // Correctly access postId from req.body
-        const newComment = new Comment({ commentContent, postID: postId }); // Use postId to assign to the 'post' field
+        const { commentContent, postId, userId } = req.body;
+        const newComment = new Comment({
+            commentContent,
+            postID: postId,
+            userID: userId
+        });
         await newComment.save();
         res.status(201).json({ message: "Comment saved successfully", comment: newComment });
     } catch (error) {
@@ -270,29 +399,106 @@ app.post("/user-comment", async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-    // console.log("You have logged in");
     const { username, password } = req.body;
-    // console.log(req.body);
-    // try {
     const user = await User.findOne({ userName: username });
-    // console.log(user);
     if (user == null) {
         return res.status(401).json({ success: false, message: 'User not found' });
     }
     if (!bcrypt.compareSync(password, user.password)) {
         return res.status(401).json({ success: false, message: 'Invalid password' });
     }
-    // console.log("You have successfully found the user");
-    // console.log(user);
     const token = setUser(user);
-    console.log(token);
-    return res.status(200).json({ success: true, message: 'Login successful', token });
-    // } catch (err) {
-    //    return res.status(500).json({ success: false, message: 'Server error' });
-    // }
+    return res.status(200).json({ success: true, message: 'Login successful', token, user });
 });
 
+const generateOTP = () => {
+    return otpGenerator.generate(6, { digits: true, alphabets: false, upperCase: false, specialChars: false });
+};
 
-app.listen(port, () => {
-    console.log(`🚀 Listening to the server at port ${port}`);
+app.post('/forgot', async (req, res) => {
+    try {
+        const fmail = req.body.email;
+        const user = await User.findOne({ email: fmail }).maxTimeMS(30000);
+        if (!user) {
+            console.log("Not a valid User....");
+        }
+        const resetToken = crypto.randomBytes(20).toString('hex');
+        user.resetToken = resetToken;
+        req.session.resetToken = resetToken;
+        req.session.email = fmail;
+        user.resetTokenExpiration = Date.now() + 600000;
+        await user.save();
+        const resetLink = `http://localhost:3000/reset-pass?resettoken=${resetToken}`;
+        const mailOptions = {
+            from: 'harshalp1002@gmail.com',
+            to: fmail,
+            subject: 'Password Reset Request',
+            html: `<P>Please click on the following link to reset your password: ${resetLink}</p>`
+        };
+        transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                console.log(error);
+                throw new Error('Failed to send email');
+            } else {
+                console.log('Email sent: ');
+                res.json({ ans: " Link has been sent on your email " })
+            }
+        });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ 'err': 'Please enter valid email address' });
+    }
+});
+
+app.post('/reset', async (req, res) => {
+    try {
+        const { password, confirm_pass, resetToken } = req.body;
+        if (password !== confirm_pass) {
+            throw new Error("Passwords do not match");
+        }
+        const user = await User.findOne({ resetToken: req.body.resetToken });
+        if (!user) {
+            throw new Error('Invalid or expired reset token');
+        }
+        const hashedPassword = await bcrypt.hash(password, 10);
+        user.password = hashedPassword;
+        user.resetToken = null;
+        user.resetTokenExpiration = null;
+        let temp = user.email;
+        await user.save();
+        const mailOptions = {
+            from: 'harshalp1002@gmail.com',
+            to: temp,
+            subject: 'Password Reset Request',
+            html: `<P> Dear sir/mam your password has been reset </p>`
+        };
+        transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                console.log(error);
+                throw new Error('Failed to send email');
+                res.json({ 'Error ': 'Failed to send email' })
+            } else {
+                console.log('Email sent : your password has been updated successful');
+                res.send(" link sent on email ")
+            }
+        });
+        res.send(' password updated successful ');
+    } catch (err) {
+        console.log(err);
+        res.status(500).send('Internal Server Error in resetting the password');
+    }
+});
+
+app.get('/uploads/posts/:postId/:imageName', (req, res) => {
+    const postId = req.params.postId;
+    const imageName = req.params.imageName;
+    const imagePath = path.join(__dirname, `./uploads/Post_Images/${postId}/${imageName}`);
+    fs.readFile(imagePath, (err, data) => {
+        if (err) {
+            console.error('Error reading image:', err);
+            return res.status(500).json({ error: 'Failed to read image' });
+        }
+        res.writeHead(200, { 'Content-Type': 'image/png' });
+        res.end(data);
+    });
 });

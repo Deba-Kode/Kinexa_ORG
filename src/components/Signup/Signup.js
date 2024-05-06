@@ -50,7 +50,7 @@ export default function Signup() {
             formDataToSend.append(key, formData[key]);
         }
         try {
-            const response = await axios.post('http://localhost:3001/register', formDataToSend);
+            const response = await axios.post('http://192.168.0.164:3001/register', formDataToSend);
             console.log(response.data); // Handle response as needed
         } catch (error) {
             console.error('Error:', error.message); // Handle error
@@ -60,7 +60,7 @@ export default function Signup() {
         window.myExternalFunction();
     }, []);
     return (
-        <div className="container">
+        <div className="container formSign">
             <header>Signup Form</header>
             <div className="progress">
                 <div className="progress-bar" role="progressbar" style={{ width: '25%' }} aria-valuenow={25} aria-valuemin={0} aria-valuemax={100}>
