@@ -54,7 +54,7 @@ const ParticularUser = () => {
       delete userDataToUpdate.coverPic;
       delete userDataToUpdate.profilePic;
   
-      const response = await axios.post("http://192.168.0.164:3001/update-user", userDataToUpdate);
+      const response = await axios.post("http://192.168.0.116:3001/update-user", userDataToUpdate);
       console.log("User data updated successfully:", response.data);
       document.getElementById("offcanvasExample").classList.remove("show");
     } catch (error) {
@@ -64,7 +64,7 @@ const ParticularUser = () => {
 
   const getProfilePic = async (img_name, userId) => {
     try {
-      const response = await axios.post("http://192.168.0.164:3001/uploads/imagesProfile", { user_id: userId, img_name });
+      const response = await axios.post("http://192.168.0.116:3001/uploads/imagesProfile", { user_id: userId, img_name });
       const profilePic = `data:image/png;base64,${response.data}`;
       setUserData(prevData => ({
         ...prevData,
@@ -77,7 +77,7 @@ const ParticularUser = () => {
 
   const getCoverPic = async (img_name, userId) => {
     try {
-      const response = await axios.post("http://192.168.0.164:3001/uploads/images", { user_id: userId, img_name });
+      const response = await axios.post("http://192.168.0.116:3001/uploads/images", { user_id: userId, img_name });
       const coverPic = `data:image/png;base64,${response.data}`;
       setUserData(prevData => ({
         ...prevData,

@@ -37,7 +37,7 @@ function ResetPassword(dispatch) {
         try {
             set_error_msg('');
             set_success_msg('')
-            const response = await axios.post("http://192.168.0.164:3001/reset", {
+            const response = await axios.post("http://192.168.0.116:3001/reset", {
                 password: formData.password,
                 confirm_pass: formData.confirm_pass,
                 resetToken: resetToken

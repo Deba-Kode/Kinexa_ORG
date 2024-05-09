@@ -21,7 +21,7 @@ export default function Login() {
     }
 
     try {
-      const response = await axios.post('http://192.168.0.164:3001/api/login', { username, password });
+      const response = await axios.post('http://192.168.0.116:3001/api/login', { username, password });
       if (response.status === 200 && response.data.success) {
         const user_name = response.data.user.userName;
         localStorage.setItem("token", response.data.token);

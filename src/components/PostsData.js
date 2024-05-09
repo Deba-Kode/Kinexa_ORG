@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useQuery } from '@apollo/client';
 import { GET_ALL_POSTS } from '../gqlOperations/queries.js';
-import Comment from './Comment.js'; 
+import Comment from './Comment.js';
 import img from '../altImage/user.png'
 
 export default function PostsData() {
-    const { loading, error, data } = useQuery(GET_ALL_POSTS);
+    const { loading, error, data, refetch } = useQuery(GET_ALL_POSTS);
     const [imgData, setIMG] = useState({});
     const [heartFilled, setHeartFilled] = useState({});
 
@@ -22,29 +22,29 @@ export default function PostsData() {
     async function fetchLikedPosts() {
         try {
             const uID = localStorage.getItem('userId');
-            const response = await axios.get(`http://192.168.0.164:3001/user-liked-posts?uID=${uID}`);
+            const response = await axios.get(`http://192.168.0.116:3001/user-liked-posts?uID=${uID}`);
             const likedPosts = response.data;
             const newHeartFilled = {};
             likedPosts.forEach(post => {
                 newHeartFilled[post._id] = true;
             });
             setHeartFilled(newHeartFilled);
-        } catch (error) {
+        }
+        catch (error) {
             console.error('Error fetching liked posts:', error.message);
         }
     }
 
     async function getPost(post) {
         try {
-            const response = await axios.post("http://192.168.0.164:3001/uploads/posts", { post_id: post._id, img_name: post.imageUpload });
+            const response = await axios.post("http://192.168.0.116:3001/uploads/posts", { post_id: post._id, img_name: post.imageUpload });
             const base64Image = `data:image/png;base64,${response.data}`;
             setIMG(prevState => ({
                 ...prevState,
                 [post._id]: base64Image
             }));
-
             if (post.userID && post.userID.profilePic) {
-                const profilePicResponse = await axios.post("http://192.168.0.164:3001/uploads/imagesProfile", { user_id: post.userID._id, img_name: post.userID.profilePic });
+                const profilePicResponse = await axios.post("http://192.168.0.116:3001/uploads/imagesProfile", { user_id: post.userID._id, img_name: post.userID.profilePic });
                 const profilePic = `data:image/png;base64,${profilePicResponse.data}`;
 
                 setIMG(prevState => ({
@@ -52,7 +52,8 @@ export default function PostsData() {
                     [`profilePic_${post.userID._id}`]: profilePic
                 }));
             }
-        } catch (error) {
+        }
+        catch (error) {
             console.error('Error fetching image:', error.message);
         }
     }
@@ -64,8 +65,10 @@ export default function PostsData() {
                 ...prevState,
                 [post_id]: !prevState[post_id]
             }));
-            await axios.post(`http://192.168.0.164:3001/like-post`, { post_id, uID });
-        } catch (error) {
+            await axios.post(`http://192.168.0.116:3001/like-post`, { post_id, uID });
+            refetch();
+        }
+        catch (error) {
             console.error('Error liking post:', error.message);
         }
     };
@@ -82,7 +85,7 @@ export default function PostsData() {
             const hours = Math.floor(seconds / 3600);
             return `${hours} h${hours > 1 ? '' : ''}`;
         }
-        else{
+        else {
             const minutes = Math.floor(seconds / 60);
             return `${minutes} m${minutes > 1 ? '' : ''}`;
         }
@@ -184,14 +187,3 @@ export default function PostsData() {
         </div>
     );
 }
-
-
-
-
-
-
-
-
-
-
-

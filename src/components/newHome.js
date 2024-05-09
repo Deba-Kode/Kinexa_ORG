@@ -31,9 +31,9 @@ const Home = () => {
                     navigate('/');
                     return;
                 }
-                await axios.post('http://192.168.0.116:3001/NameUserLog', { UserName });
+                await axios.post('http://192.168.0.164:3001/NameUserLog', { UserName });
 
-                const response = await axios.get('http://192.168.0.116:3001/api/verify', {
+                const response = await axios.get('http://192.168.0.164:3001/api/verify', {
                     headers: {
                         Authorization: `Bearer ${token}`
                     }
@@ -77,7 +77,7 @@ const Home = () => {
                     navigate('/');
                     return;
                 }
-                const response = await axios.get('http://192.168.0.116:3001/api/verify', {
+                const response = await axios.get('http://192.168.0.164:3001/api/verify', {
                     headers: {
                         Authorization: `Bearer ${token}`
                     }
@@ -133,7 +133,7 @@ const Home = () => {
         try {
             // console.log("User id to send to the posts api", userID);
 
-            const response = await axios.post('http://192.168.0.116:3001/upload-post', formDataToSend);
+            const response = await axios.post('http://192.168.0.164:3001/upload-post', formDataToSend);
             // console.log(response.data);
         } catch (error) {
             console.error('Error:', error.message);

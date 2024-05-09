@@ -50,7 +50,7 @@ export default function Signup() {
             formDataToSend.append(key, formData[key]);
         }
         try {
-            const response = await axios.post('http://192.168.0.164:3001/register', formDataToSend);
+            const response = await axios.post('http://192.168.0.116:3001/register', formDataToSend);
             console.log(response.data); // Handle response as needed
         } catch (error) {
             console.error('Error:', error.message); // Handle error

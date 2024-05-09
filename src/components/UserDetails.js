@@ -29,7 +29,7 @@ export default function UserDetails() {
 
   async function getImage(user_id, img_name) {
     try {
-      const response = await axios.post("http://192.168.0.164:3001/uploads/images", { user_id, img_name });
+      const response = await axios.post("http://192.168.0.116:3001/uploads/images", { user_id, img_name });
       return `data:image/png;base64,${response.data}`;
     } catch (error) {
       console.error("Error fetching cover picture for user", user_id, ":", error);
@@ -39,7 +39,7 @@ export default function UserDetails() {
 
   async function getProfileImage(user_id, img_name) {
     try {
-      const response = await axios.post("http://192.168.0.164:3001/uploads/imagesProfile", { user_id, img_name });
+      const response = await axios.post("http://192.168.0.116:3001/uploads/imagesProfile", { user_id, img_name });
       return `data:image/png;base64,${response.data}`;
     } catch (error) {
       console.error("Error fetching profile picture for user", user_id, ":", error);

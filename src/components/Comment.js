@@ -7,10 +7,11 @@ import { GET_COMMENTS_BY_POST } from '../gqlOperations/queries.js';
 
 const Comment = ({ postId }) => {
     const [comment, setComment] = useState('');
-    const [showPicker, setShowPicker] = useState(false);
-    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [showCommentPicker, setShowCommentPicker] = useState(false);
+    const [showSmileyPicker, setShowSmileyPicker] = useState(false);
     const [selectedCommentIndex, setSelectedCommentIndex] = useState(null);
-    const { loading, error, data } = useQuery(GET_COMMENTS_BY_POST, { variables: { postId } });
+    const [selectedEmojis, setSelectedEmojis] = useState({});
+    const { loading, error, data, refetch } = useQuery(GET_COMMENTS_BY_POST, { variables: { postId } });
 
     useEffect(() => {
         if (!loading && data) {
@@ -24,29 +25,39 @@ const Comment = ({ postId }) => {
 
     const handleEmojiClick = (emojiObject) => {
         setComment(comment + emojiObject.emoji);
+        setShowSmileyPicker(false);
     };
 
-    const handleEmojiPickerToggle = () => {
-        setShowEmojiPicker(!showEmojiPicker);
+    const handleCommentPickerToggle = () => {
+        setShowCommentPicker(!showCommentPicker);
+    };
+
+    const handleSmileyPickerToggle = () => {
+        setShowSmileyPicker(!showSmileyPicker);
     };
 
     const handleCommentClick = (index) => {
-        if (selectedCommentIndex === index && showEmojiPicker) {
-            setShowEmojiPicker(false);
-        } else {
-            setSelectedCommentIndex(index);
-            setShowEmojiPicker(true);
-        }
+        setSelectedCommentIndex(index);
+        setShowCommentPicker(true);
+    };
+
+    const handleCommentEmojiClick = (emojiObject, index) => {
+        setSelectedEmojis({
+            ...selectedEmojis,
+            [index]: emojiObject.emoji
+        });
+        setShowCommentPicker(false);
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
             const id = localStorage.getItem('userId');
-            await axios.post('http://192.168.0.164:3001/user-comment', {
+            await axios.post('http://192.168.0.116:3001/user-comment', {
                 commentContent: comment,
                 postId: postId,
-                userId: id
+                userId: id,
+                reactionEmoji: selectedEmojis
             });
             setComment('');
             const modalId = `exampleModal-${postId}`;
@@ -58,7 +69,9 @@ const Comment = ({ postId }) => {
             else {
                 console.error("Modal or close button not found");
             }
-        } catch (error) {
+            refetch();
+        }
+        catch (error) {
             console.error('Error:', error.message);
         }
     };
@@ -99,13 +112,19 @@ const Comment = ({ postId }) => {
                                 <div className="d-flex justify-content-start align-item-start m-0" style={{ cursor: "pointer" }} onClick={() => handleCommentClick(index)}>
                                     <strong>{commentItem.userID.userName}</strong>&nbsp;{commentItem.commentContent}
                                 </div>
+                                {selectedEmojis[index] && (
+                                    <div className="d-flex justify-content-start align-item-start m-0">
+                                        <span style={{ marginRight: '5px' }}>{selectedEmojis[index]}</span>
+                                    </div>
+                                )}
                                 <div className='d-flex justify-content-start mb-1'>
                                     <span style={{ fontSize: "10px" }} className=''>{getTimeAgo(commentItem.commentAt)}</span>
                                 </div>
-                                {showEmojiPicker && selectedCommentIndex === index && (
-                                    <div id='emoji' style={{ position: 'absolute', right: '5vw', bottom: "120px" }}>
+
+                                {showCommentPicker && selectedCommentIndex === index && (
+                                    <div id='commentEmoji' style={{ position: 'absolute', right: '5vw', bottom: "120px" }}>
                                         <Picker
-                                            onEmojiClick={handleEmojiClick}
+                                            onEmojiClick={(emojiObject) => handleCommentEmojiClick(emojiObject, index)} // Pass index
                                             height={600}
                                             disableSearchBar={true}
                                             disableSkinTonePicker={true}
@@ -124,20 +143,26 @@ const Comment = ({ postId }) => {
                                     className="form-control rounded-pill emoji-icon"
                                     id={`comment-${postId}`}
                                     name="comment"
-                                    onClick={() => setShowEmojiPicker(false)} // Close emoji picker when input is clicked
+                                    onClick={() => {
+                                        setShowSmileyPicker(false);
+                                        handleCommentPickerToggle();
+                                    }}
                                     onChange={handleCommentChange}
                                     value={comment}
                                 />
                                 <FaSmile
                                     className="ml-2 me-2 cursor-pointer position-absolute end-0"
-                                    onClick={handleEmojiPickerToggle}
+                                    onClick={handleSmileyPickerToggle}
                                     style={{ width: "30px", height: "30px", cursor: "pointer" }}
                                 />
                                 {
-                                    showPicker && (
+                                    showSmileyPicker && (
                                         <div className="position-absolute">
                                             <Picker
-                                                pickerStyle={{ width: '100%' }}
+                                                height={200}
+                                                disableSearchBar={true}
+                                                disableSkinTonePicker={true}
+                                                reactionsDefaultOpen={true}
                                                 onEmojiClick={handleEmojiClick}
                                             />
                                         </div>

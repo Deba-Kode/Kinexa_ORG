@@ -95,7 +95,7 @@ const server = new ApolloServer({
     cors: {
         origin: [
             "http://localhost:3000",
-            "http://192.168.0.164:3000",
+            "http://192.168.0.161:3000",
         ],
         methods: ["GET", "POST"]
     },
@@ -501,4 +501,25 @@ app.get('/uploads/posts/:postId/:imageName', (req, res) => {
         res.writeHead(200, { 'Content-Type': 'image/png' });
         res.end(data);
     });
+});
+
+app.delete('/delete-post/:postId', async (req, res) => {
+    try {
+        const postId = req.params.postId;
+        const deletedPost = await Post.findByIdAndDelete(postId);
+        if (!deletedPost) {
+            return res.status(404).json({ error: "Post not found" });
+        }
+        const imagePath = path.join(__dirname, `./uploads/Post_Images/${postId}`);
+        fs.rm(imagePath, { recursive: true, force: true }, (err) => {
+            if (err) {
+                console.error("Error deleting post image:", err);
+                return res.status(500).json({ error: "Failed to delete post image" });
+            }
+            res.status(200).json({ message: "Post deleted successfully" });
+        });
+    } catch (error) {
+        console.error("Error deleting post:", error);
+        res.status(500).json({ error: "Failed to delete post" });
+    }
 });
